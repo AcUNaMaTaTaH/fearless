@@ -117,6 +117,8 @@
             gap: 10px;
             padding: 10px;
             min-height: 0;
+            overflow-x: auto;
+            min-width: 700px;
         }
 
         .side {
@@ -331,7 +333,7 @@
         }
 
         /* Mobile */
-        @media (max-width: 1000px) {
+        /* @media (max-width: 1000px) {
             #main {
                 grid-template-columns: 1fr;
             }
@@ -339,7 +341,7 @@
             .side {
                 max-height: 30vh;
             }
-        }
+        } */
     </style>
 </head>
 
@@ -776,13 +778,15 @@
                     const champId = e.dataTransfer.getData("text/plain");
                     const fromSide = e.dataTransfer.getData("side");
 
-                    // Only allow moving inside same side
-                    if (fromSide !== side) return;
-
                     const champ = champions.find(x => x.id === champId);
                     if (!champ) return;
 
+                    // Move to the new side
+                    champ.state = side;
+
+                    // Assign new role
                     champ.pickedRole = role;
+
                     renderAll();
                 };
 
