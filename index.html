@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FEARLESS Draft Board</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b0b0d;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        :root {
+            --tileSize: 100px;
+        }
+
+        /* ===== Header ===== */
+        header {
+            padding: 10px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            background: #111;
+            border-bottom: 1px solid #222;
+        }
+
+        #headerCenter {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        input {
+            background: #1b1b1f;
+            border: 1px solid #2b2b33;
+            color: #fff;
+            border-radius: 8px;
+            padding: 8px 10px;
+            outline: none;
+            width: 300px;
+            max-width: 80vw;
+        }
+
+        .roleSection.drag-over {
+            outline: 2px dashed #4aa3ff;
+            box-shadow: 0 0 12px rgba(74, 163, 255, 0.6);
+            background: #101820;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            background: #222;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+
+        .btn.reset {
+            background: #b71c1c;
+        }
+
+        .btn.active {
+            background: #1e88e5;
+        }
+
+        /* Pro Pool toggle */
+        .btn.toggle {
+            position: relative;
+            font-weight: bold;
+            letter-spacing: 0.3px;
+            border: 1px solid #2f2f2f;
+            background: linear-gradient(180deg, #1f1f1f, #141414);
+            transition: all 0.2s ease;
+        }
+
+        .btn.toggle::before {
+            content: "★";
+            margin-right: 6px;
+            opacity: 0.6;
+        }
+
+        .btn.toggle.on {
+            background: linear-gradient(180deg, #2e7d32, #1b5e20);
+            border-color: #4caf50;
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.6);
+            color: #eaffea;
+        }
+
+        .btn.toggle.on::before {
+            content: "🔥";
+            opacity: 1;
+        }
+
+        .btn.toggle:hover {
+            transform: translateY(-1px);
+        }
+
+        /* ===== Main layout ===== */
+        #main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: minmax(260px, 1fr) 2fr minmax(260px, 1fr);
+            gap: 10px;
+            padding: 10px;
+            min-height: 0;
+        }
+
+        .side {
+            background: #141414;
+            border-radius: 12px;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .side h2 {
+            text-align: center;
+            margin: 6px 0 10px;
+        }
+
+        #blueSide h2 {
+            color: #4aa3ff;
+        }
+
+        #redSide h2 {
+            color: #ff4a4a;
+        }
+
+        .roleSection {
+            margin-bottom: 6px;
+            border: 1px solid #222;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .roleHeader {
+            background: #101012;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .roleBody {
+            padding: 6px;
+            min-height: 90px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        #center {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 0;
+        }
+
+        #poolBox {
+            background: #141414;
+            border-radius: 12px;
+            padding: 10px;
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #gridWrap {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(var(--tileSize), 1fr));
+            gap: 8px;
+        }
+
+        .champ {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 6px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .champ.locked {
+            opacity: 0.3;
+            filter: grayscale(100%);
+        }
+
+        .champ img {
+            width: 100%;
+            border-radius: 8px;
+        }
+
+        .champ-name {
+            font-size: 11px;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .badge.blue {
+            color: #72b7ff;
+        }
+
+        .badge.red {
+            color: #ff7a7a;
+        }
+
+        .badge.ban {
+            color: #cfcfcf;
+        }
+
+        /* Side tiles */
+        .sideGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(calc(var(--tileSize) / 1.5), 1fr));
+            gap: 4px;
+            width: 100%;
+        }
+
+        .sideTile {
+            background: #1c1c1c;
+            border-radius: 6px;
+            padding: 3px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        .sideTile img {
+            width: 100%;
+            border-radius: 6px;
+        }
+
+        .sideTile .name {
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tutorial {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .tutorial.hidden {
+            display: none;
+        }
+
+        .tutorialBox {
+            background: #141414;
+            border-radius: 12px;
+            padding: 20px 24px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .tutorialBox h2 {
+            margin-top: 0;
+            text-align: center;
+        }
+
+        .tutorialBox ul {
+            padding-left: 18px;
+        }
+
+        .tutorialBox li {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .credit {
+            font-size: 12px;
+            opacity: 0.7;
+            white-space: nowrap;
+        }
+
+        .credit b {
+            color: #4aa3ff;
+            font-weight: 600;
+        }
+
+        #roleBar {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #222;
+        }
+
+        #roleBar .btn {
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 10px;
+        }
+
+        /* Mobile */
+        @media (max-width: 1000px) {
+            #main {
+                grid-template-columns: 1fr;
+            }
+
+            .side {
+                max-height: 30vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div></div>
+        <div id="headerCenter">
+            <button class="btn" id="showTutorial">❔ Tutorial</button>
+            <button class="btn toggle" id="proToggle">Pro Pool 2026</button>
+            <input id="search" placeholder="Search champion...">
+            <input id="sizeSlider" type="range" min="70" max="150" value="100" style="width:140px;">
+        </div>
+        <div style="display:flex;justify-content:flex-end; align-items:center; gap:10px;">
+            <button class="btn reset" id="reset">Reset</button>
+        </div>
+    </header>
+
+    <div id="main">
+        <div id="blueSide" class="side">
+            <h2>Blue Side</h2>
+            <div id="blueSections"></div>
+        </div>
+        <div id="center">
+            <div id="poolBox">
+                <div id="tutorialOverlay" class="tutorial hidden">
+                    <div class="tutorialBox">
+                        <h2>Welcome to the FEARLESS Draft Board</h2>
+                        <ul>
+                            <li>🟦 <b>Left click</b> a champion → Pick for <b>Blue</b></li>
+                            <li>🟥 <b>Right click</b> a champion → Pick for <b>Red</b></li>
+                            <li>🚫 <b>Middle click</b> → Remove / Ban</li>
+                            <li>🔁 <b>Click again</b> on a picked champion → Undo</li>
+                            <li>🖱️ <b>Drag & drop</b> inside Blue/Red → Change role</li>
+                        </ul>
+                        <button id="closeTutorial" class="btn active" style="width: 100%;">Got it!</button>
+                    </div>
+                </div>
+
+                <div id="resetOverlay" class="tutorial hidden">
+                    <div class="tutorialBox">
+                        <h2>Reset draft?</h2>
+                        <p style="text-align:center; opacity:0.85; line-height:1.4;">
+                            This will clear <b>Blue</b>, <b>Red</b> and <b>bans</b>.<br>
+                            This action cannot be undone.
+                        </p>
+                        <div style="display:flex; gap:10px; margin-top:16px;">
+                            <button id="cancelReset" class="btn" style="flex:1;">Cancel</button>
+                            <button id="confirmReset" class="btn reset" style="flex:1;">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="roleBar">
+                    <button class="btn active roleBtn" data-role="All">All</button>
+                    <button class="btn roleBtn" data-role="Top">Top</button>
+                    <button class="btn roleBtn" data-role="Jungle">Jungle</button>
+                    <button class="btn roleBtn" data-role="Mid">Mid</button>
+                    <button class="btn roleBtn" data-role="Bottom">Bottom</button>
+                    <button class="btn roleBtn" data-role="Support">Support</button>
+                </div>
+
+                <div id="gridWrap">
+                    <div id="grid"></div>
+                </div>
+            </div>
+        </div>
+        <div id="redSide" class="side">
+            <h2>Red Side</h2>
+            <div id="redSections"></div>
+        </div>
+    </div>
+
+    <div style="text-align:center; font-size:12px; opacity:0.6; padding:6px 0;">
+        FEARLESS Draft Board — Made by <b style="color:#4aa3ff;">@red_cfg</b>
+    </div>
+
+    <script>
+        const SAVE_KEY = "lol_draft_board_save_v1";
+        const ROLES = ["Top", "Jungle", "Mid", "Bottom", "Support"];
+        const sizeSlider = document.getElementById("sizeSlider");
+        const proToggleBtn = document.getElementById("proToggle");
+        const TUTORIAL_KEY = "lol_draft_board_seen_tutorial";
+        let proOnly = false;
+
+        proToggleBtn.onclick = () => {
+            proOnly = !proOnly;
+            proToggleBtn.classList.toggle("on", proOnly);
+            renderPool();
+            saveState();
+        };
+
+        const PRO_POOL_2026 = new Set([
+            "Aatrox", "Ahri", "Akali", "Alistar", "Ambessa", "Amumu", "Anivia", "Annie", "Aphelios", "Ashe", "AurelionSol", "Aurora", "Azir",
+            "Bard", "Belveth", "Blitzcrank", "Brand", "Braum", "Caitlyn", "Camille", "Cassiopeia", "ChoGath", "Corki", "Darius", "Diana",
+            "DrMundo", "Draven", "Ekko", "Elise", "Evelynn", "Ezreal", "Fiddlesticks", "Fiora", "Fizz", "Galio", "Gnar", "Gragas", "Graves",
+            "Gwen", "Hecarim", "Heimerdinger", "Illaoi", "Irelia", "JarvanIV", "Jax", "Jayce", "Jhin", "Jinx", "KSante", "Kalista", "Karma",
+            "Karthus", "Kassadin", "KaiSa", "Kayle", "Kayn", "Kennen", "Khazix", "Kindred", "Kled", "KogMaw", "LeeSin", "LeBlanc", "Leona",
+            "Lillia", "Lissandra", "Lucian", "Lulu", "Lux", "Maokai", "Malphite", "MasterYi", "MissFortune", "Milio", "Mordekaiser",
+            "Morgana", "Naafiri", "Nami", "Nasus", "Nautilus", "Neeko", "Nilah", "Nocturne", "Nunu", "Olaf", "Orianna", "Ornn", "Pantheon",
+            "Poppy", "Pyke", "Qiyana", "Quinn", "Rakan", "Rammus", "RekSai", "Renata", "Renekton", "Rengar", "Rell", "Riven", "Rumble",
+            "Ryze", "Samira", "Sejuani", "Senna", "Seraphine", "Shaco", "Shen", "Shyvana", "Sion", "Sivir", "Skarner", "Smolder", "Sona",
+            "Soraka", "Swain", "Sylas", "Syndra", "TahmKench", "Taliyah", "Taric", "Thresh", "Tristana", "Trundle", "Twitch", "TwistedFate",
+            "Udyr", "Varus", "Vayne", "Veigar", "Velkoz", "Vex", "Viego", "Viktor", "Volibear", "Warwick", "Wukong", "Xayah", "Xerath",
+            "XinZhao", "Yasuo", "Yone", "Yorick", "Yunara", "Zac", "Zed", "Zeri", "Ziggs", "Zilean", "Zoe", "Zyra", "Zaahen"
+        ]);
+
+        const ROLE_MAP = {
+            // ===== From your TOP screenshot =====
+            Aatrox: ["Top", "Jungle"],
+            Akali: ["Top", "Mid"],
+            Ambessa: ["Top", "Jungle"],
+            Anivia: ["Top", "Mid"],
+            Aurora: ["Top", "Mid"],
+            Camille: ["Top"],
+            Cassiopeia: ["Top", "Mid"],
+            ChoGath: ["Top", "Mid"],
+            Darius: ["Top", "Jungle"],
+            DrMundo: ["Top", "Jungle"],
+            Fiddlesticks: ["Top", "Jungle", "Support"],
+            Fiora: ["Top"],
+            Gangplank: ["Top"],
+            Garen: ["Top"],
+            Gnar: ["Top"],
+            Gragas: ["Top", "Jungle"],
+            Gwen: ["Top", "Jungle"],
+            Heimerdinger: ["Top"],
+            Illaoi: ["Top"],
+            Irelia: ["Top", "Mid"],
+            Jax: ["Top", "Jungle"],
+            Jayce: ["Top", "Mid", "Jungle"],
+            KSante: ["Top"],
+            Kayle: ["Top", "Mid"],
+            Kennen: ["Top"],
+            Kled: ["Top"],
+            Malphite: ["Top", "Mid", "Jungle"],
+            Maokai: ["Top", "Jungle", "Support"],
+            MasterYi: ["Top", "Jungle"],
+            Mordekaiser: ["Top"],
+            Nasus: ["Top", "Jungle"],
+            Olaf: ["Top"],
+            Ornn: ["Top"],
+            Pantheon: ["Top", "Mid", "Jungle", "Support"],
+            Poppy: ["Top", "Jungle", "Support"],
+            Quinn: ["Top"],
+            Renekton: ["Top"],
+            Riven: ["Top"],
+            Rumble: ["Top"],
+            Ryze: ["Top", "Mid"],
+            Sett: ["Top"],
+            Shen: ["Top", "Jungle"],
+            Singed: ["Top"],
+            Sion: ["Top", "Mid"],
+            Swain: ["Top", "Mid", "Bottom", "Support"],
+            Sylas: ["Top", "Mid", "Jungle"],
+            TahmKench: ["Top", "Support"],
+            Teemo: ["Top", "Jungle"],
+            Trundle: ["Top", "Jungle"],
+            Tryndamere: ["Top"],
+            Udyr: ["Top", "Jungle"],
+            Urgot: ["Top"],
+            Varus: ["Top", "Bottom", "Mid"],
+            Vayne: ["Top", "Bottom"],
+            Vladimir: ["Top", "Mid"],
+            Volibear: ["Top", "Jungle"],
+            Warwick: ["Top", "Jungle"],
+            Wukong: ["Top", "Jungle"],
+            Yasuo: ["Top", "Mid", "Bottom"],
+            Yone: ["Top", "Mid"],
+            Yorick: ["Top"],
+            Zaahen: ["Top", "Jungle"],
+            Zac: ["Top", "Jungle"],
+
+            // ===== From your JUNGLE screenshot extras =====
+            Amumu: ["Jungle"],
+            Belveth: ["Jungle"],
+            Brand: ["Jungle", "Mid", "Bottom", "Support"],
+            Briar: ["Jungle"],
+            Diana: ["Jungle", "Mid"],
+            Ekko: ["Jungle", "Mid"],
+            Elise: ["Jungle", "Support"],
+            Evelynn: ["Jungle"],
+            Fizz: ["Jungle", "Mid"],
+            Graves: ["Jungle"],
+            Hecarim: ["Jungle"],
+            Ivern: ["Jungle"],
+            JarvanIV: ["Jungle"],
+            Karthus: ["Jungle"],
+            Kayn: ["Jungle"],
+            Khazix: ["Jungle"],
+            Kindred: ["Jungle"],
+            LeeSin: ["Jungle"],
+            Lillia: ["Jungle"],
+            Naafiri: ["Jungle", "Mid"],
+            Nidalee: ["Jungle"],
+            Nocturne: ["Jungle"],
+            Nunu: ["Jungle"],
+            Qiyana: ["Jungle", "Mid"],
+            Rammus: ["Jungle"],
+            RekSai: ["Jungle"],
+            Rengar: ["Jungle"],
+            Sejuani: ["Jungle"],
+            Shaco: ["Jungle", "Support"],
+            Shyvana: ["Jungle"],
+            Taliyah: ["Jungle", "Mid"],
+            Talon: ["Jungle", "Mid"],
+            Vi: ["Jungle"],
+            Viego: ["Jungle"],
+            XinZhao: ["Jungle"],
+            Zed: ["Jungle", "Mid"],
+            Zyra: ["Jungle", "Support"],
+
+            // ===== From your MID screenshot extras =====
+            Ahri: ["Mid"],
+            Akshan: ["Mid"],
+            Annie: ["Mid", "Support"],
+            AurelionSol: ["Mid", "Bottom"],
+            Azir: ["Mid"],
+            Galio: ["Mid", "Support"],
+            Hwei: ["Mid", "Support"],
+            Kassadin: ["Mid"],
+            Katarina: ["Mid"],
+            KogMaw: ["Mid", "Bottom"],
+            LeBlanc: ["Mid", "Support"],
+            Lissandra: ["Mid"],
+            Lux: ["Mid", "Support"],
+            Malzahar: ["Mid"],
+            Mel: ["Mid", "Bottom", "Support"],
+            Orianna: ["Mid"],
+            Smolder: ["Mid", "Bottom"],
+            Syndra: ["Mid"],
+            TwistedFate: ["Mid"],
+            Veigar: ["Mid", "Bottom"],
+            Velkoz: ["Mid", "Support"],
+            Vex: ["Mid"],
+            Viktor: ["Mid"],
+            Xerath: ["Mid", "Support"],
+            Ziggs: ["Mid", "Bottom"],
+            Zoe: ["Mid", "Support"],
+
+            // ===== From your BOTTOM screenshot extras =====
+            Aphelios: ["Bottom"],
+            Ashe: ["Bottom", "Support"],
+            Caitlyn: ["Bottom"],
+            Corki: ["Bottom"],
+            Draven: ["Bottom"],
+            Ezreal: ["Bottom"],
+            Jhin: ["Bottom"],
+            Jinx: ["Bottom"],
+            KaiSa: ["Bottom"],
+            Kalista: ["Bottom"],
+            Lucian: ["Bottom"],
+            MissFortune: ["Bottom"],
+            Nilah: ["Bottom"],
+            Samira: ["Bottom"],
+            Senna: ["Bottom", "Support"],
+            Sivir: ["Bottom"],
+            Tristana: ["Bottom"],
+            Twitch: ["Bottom"],
+            Xayah: ["Bottom"],
+            Yunara: ["Bottom"],
+            Zeri: ["Bottom"],
+
+            // ===== From your SUPPORT screenshot extras =====
+            Alistar: ["Support"],
+            Bard: ["Support"],
+            Blitzcrank: ["Support"],
+            Braum: ["Support"],
+            Janna: ["Support"],
+            Karma: ["Support"],
+            Leona: ["Support"],
+            Lulu: ["Support"],
+            Milio: ["Support"],
+            Morgana: ["Support"],
+            Nami: ["Support"],
+            Nautilus: ["Support"],
+            Neeko: ["Support"],
+            Pyke: ["Support"],
+            Rakan: ["Support"],
+            Rell: ["Support"],
+            Renata: ["Support"],
+            Seraphine: ["Support"],
+            Sona: ["Support"],
+            Soraka: ["Support"],
+            Taric: ["Support"],
+            Thresh: ["Support"],
+            Yuumi: ["Support"],
+            Zilean: ["Support"]
+        };
+
+        let champions = [];
+        let currentRole = "All";
+        let searchText = "";
+
+        const grid = document.getElementById("grid");
+        const blueSections = document.getElementById("blueSections");
+        const redSections = document.getElementById("redSections");
+        const searchInput = document.getElementById("search");
+        const resetBtn = document.getElementById("reset");
+        const roleBtns = document.querySelectorAll(".roleBtn");
+
+        sizeSlider.oninput = () => {
+            document.documentElement.style.setProperty("--tileSize", sizeSlider.value + "px");
+            saveState();
+        };
+
+        function badge(text, cls) {
+            const b = document.createElement("div");
+            b.className = "badge " + cls;
+            b.textContent = text;
+            return b;
+        }
+
+        function getAssignedRole(champ) {
+            if (currentRole !== "All" && champ.roles.includes(currentRole)) {
+                return currentRole; // use the currently selected role
+            }
+            // fallback: first role only
+            return champ.roles[0];
+        }
+
+        async function loadChampions() {
+            const versions = await fetch("https://ddragon.leagueoflegends.com/api/versions.json").then(r => r.json());
+            const version = versions[0];
+            const data = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`).then(r => r.json());
+            champions = Object.values(data.data).map(c => ({
+                name: c.name,
+                id: c.id,
+                image: `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${c.image.full}`,
+                roles: ROLE_MAP[c.id] || ["Top"],
+                state: "pool",
+                pickedRole: null
+            }));
+            const loaded = loadState();
+            renderAll();
+            const seen = localStorage.getItem(TUTORIAL_KEY);
+            if (!seen) {
+                document.getElementById("tutorialOverlay").classList.remove("hidden");
+            }
+        }
+
+        function renderPool() {
+            grid.innerHTML = "";
+            const list = champions.filter(c => {
+                if (proOnly && !PRO_POOL_2026.has(c.id)) return false;
+                if (currentRole !== "All" && !c.roles.includes(currentRole)) return false;
+                if (searchText && !c.name.toLowerCase().includes(searchText)) return false;
+                return true;
+            }).sort((a, b) => a.name.localeCompare(b.name));
+
+            for (const c of list) {
+                const div = document.createElement("div");
+                div.className = "champ" + (c.state !== "pool" ? " locked" : "");
+                const img = document.createElement("img");
+                img.src = c.image;
+                const name = document.createElement("div");
+                name.className = "champ-name";
+                name.textContent = c.name;
+                div.appendChild(img);
+                div.appendChild(name);
+
+                if (c.state === "blue") div.appendChild(badge("BLUE", "blue"));
+                if (c.state === "red") div.appendChild(badge("RED", "red"));
+                if (c.state === "ban") div.appendChild(badge("REMOVED", "ban"));
+
+                div.onclick = () => {
+                    if (c.state === "pool") {
+                        c.state = "blue";
+                        c.pickedRole = getAssignedRole(c);
+                    } else {
+                        c.state = "pool";
+                        c.pickedRole = null;
+                    }
+                    renderAll();
+                };
+                div.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    if (c.state === "pool") {
+                        c.state = "red";
+                        c.pickedRole = getAssignedRole(c);
+                    } else {
+                        c.state = "pool";
+                        c.pickedRole = null;
+                    }
+                    renderAll();
+                };
+                div.onmousedown = (e) => {
+                    if (e.button === 1) {
+                        e.preventDefault();
+                        if (c.state === "pool") {
+                            c.state = "ban";
+                            c.pickedRole = null;
+                        } else {
+                            c.state = "pool";
+                            c.pickedRole = null;
+                        }
+                        renderAll();
+                    }
+                };
+
+                grid.appendChild(div);
+            }
+        }
+
+        function renderSide(container, side) {
+            container.innerHTML = "";
+
+            for (const role of ROLES) {
+                const list = champions.filter(c => c.state === side && c.pickedRole === role);
+
+                const sec = document.createElement("div");
+                sec.className = "roleSection";
+
+                const h = document.createElement("div");
+                h.className = "roleHeader";
+                h.textContent = role;
+
+                const body = document.createElement("div");
+                body.className = "roleBody";
+
+                // --- Drop zone for this role ---
+                body.ondragover = (e) => {
+                    e.preventDefault(); // allow drop
+                    sec.classList.add("drag-over");
+                };
+
+                body.ondragleave = () => {
+                    sec.classList.remove("drag-over");
+                };
+
+                body.ondrop = (e) => {
+                    e.preventDefault();
+                    sec.classList.remove("drag-over");
+
+                    const champId = e.dataTransfer.getData("text/plain");
+                    const fromSide = e.dataTransfer.getData("side");
+
+                    // Only allow moving inside same side
+                    if (fromSide !== side) return;
+
+                    const champ = champions.find(x => x.id === champId);
+                    if (!champ) return;
+
+                    champ.pickedRole = role;
+                    renderAll();
+                };
+
+                const g = document.createElement("div");
+                g.className = "sideGrid";
+
+                for (const c of list) {
+                    const tile = document.createElement("div");
+                    tile.className = "sideTile";
+                    tile.draggable = true;
+
+                    tile.ondragstart = (e) => {
+                        e.dataTransfer.setData("text/plain", c.id);
+                        e.dataTransfer.setData("side", side);
+                    };
+
+                    const img = document.createElement("img");
+                    img.src = c.image;
+
+                    const n = document.createElement("div");
+                    n.className = "name";
+                    n.textContent = c.name;
+
+                    tile.appendChild(img);
+                    tile.appendChild(n);
+
+                    // Click to remove back to pool
+                    tile.onclick = () => {
+                        c.state = "pool";
+                        c.pickedRole = null;
+                        renderAll();
+                    };
+
+                    g.appendChild(tile);
+                }
+
+                body.appendChild(g);
+                sec.appendChild(h);
+                sec.appendChild(body);
+                container.appendChild(sec);
+            }
+        }
+
+        function renderAll() {
+            renderPool();
+            renderSide(blueSections, "blue");
+            renderSide(redSections, "red");
+            saveState();
+
+            const seen = localStorage.getItem(TUTORIAL_KEY);
+            if (!seen) {
+                document.getElementById("tutorialOverlay").classList.remove("hidden");
+            }
+        }
+
+        document.getElementById("showTutorial").onclick = () => {
+            document.getElementById("tutorialOverlay").classList.remove("hidden");
+        };
+
+        document.getElementById("closeTutorial").onclick = () => {
+            localStorage.setItem(TUTORIAL_KEY, "1");
+            document.getElementById("tutorialOverlay").classList.add("hidden");
+        };
+
+        roleBtns.forEach(b => {
+            b.onclick = () => {
+                roleBtns.forEach(x => x.classList.remove("active"));
+                b.classList.add("active");
+                currentRole = b.dataset.role;
+                renderPool();
+            };
+        });
+
+        searchInput.oninput = () => {
+            searchText = searchInput.value.toLowerCase();
+            if (searchText && currentRole !== "All") {
+                currentRole = "All";
+                roleBtns.forEach(x => x.classList.remove("active"));
+                document.querySelector('.roleBtn[data-role="All"]').classList.add("active");
+            }
+            renderPool();
+        };
+
+        resetBtn.onclick = () => {
+            document.getElementById("resetOverlay").classList.remove("hidden");
+        };
+
+        document.getElementById("cancelReset").onclick = () => {
+            document.getElementById("resetOverlay").classList.add("hidden");
+        };
+
+        document.getElementById("confirmReset").onclick = () => {
+            champions.forEach(c => {
+                c.state = "pool";
+                c.pickedRole = null;
+            });
+
+            localStorage.removeItem(SAVE_KEY);
+            document.getElementById("resetOverlay").classList.add("hidden");
+            renderAll();
+        };
+
+        function saveState() {
+            const data = {
+                champions: champions.map(c => ({
+                    id: c.id,
+                    state: c.state,
+                    pickedRole: c.pickedRole
+                })),
+                proOnly,
+                currentRole,
+                tileSize: sizeSlider.value
+            };
+            localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+        }
+
+        function loadState() {
+            const raw = localStorage.getItem(SAVE_KEY);
+            if (!raw) return false;
+
+            try {
+                const data = JSON.parse(raw);
+
+                // restore globals
+                proOnly = !!data.proOnly;
+                currentRole = data.currentRole || "All";
+                if (data.tileSize) {
+                    sizeSlider.value = data.tileSize;
+                    document.documentElement.style.setProperty("--tileSize", data.tileSize + "px");
+                }
+
+                proToggleBtn.classList.toggle("on", proOnly);
+
+                // restore champions state
+                for (const saved of data.champions || []) {
+                    const champ = champions.find(c => c.id === saved.id);
+                    if (!champ) continue;
+                    champ.state = saved.state || "pool";
+                    champ.pickedRole = saved.pickedRole || null;
+                }
+
+                // restore role button UI
+                roleBtns.forEach(x => x.classList.remove("active"));
+                const btn = document.querySelector(`.roleBtn[data-role="${currentRole}"]`);
+                if (btn) btn.classList.add("active");
+
+                return true;
+            } catch (e) {
+                console.error("Failed to load save:", e);
+                return false;
+            }
+        }
+
+        loadChampions();
+    </script>
+</body>
+
+</html>
