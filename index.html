@@ -355,6 +355,7 @@
             <input id="sizeSlider" type="range" min="70" max="150" value="100" style="width:140px;">
         </div>
         <div style="display:flex;justify-content:flex-end; align-items:center; gap:10px;">
+            <button class="btn" id="shareBtn">Share</button>
             <button class="btn reset" id="reset">Reset</button>
         </div>
     </header>
@@ -663,9 +664,11 @@
         }
 
         async function loadChampions() {
+
             const versions = await fetch("https://ddragon.leagueoflegends.com/api/versions.json").then(r => r.json());
             const version = versions[0];
             const data = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`).then(r => r.json());
+
             champions = Object.values(data.data).map(c => ({
                 name: c.name,
                 id: c.id,
@@ -674,12 +677,14 @@
                 state: "pool",
                 pickedRole: null
             }));
-            const loaded = loadState();
-            renderAll();
-            const seen = localStorage.getItem(TUTORIAL_KEY);
-            if (!seen) {
-                document.getElementById("tutorialOverlay").classList.remove("hidden");
+
+            const params = new URLSearchParams(window.location.search);
+            const shared = params.get("draft");
+            if (shared) {
+                applyShareData(shared);
             }
+
+            renderAll();
         }
 
         function renderPool() {
@@ -874,6 +879,18 @@
             document.getElementById("resetOverlay").classList.remove("hidden");
         };
 
+        document.getElementById("shareBtn").onclick = async () => {
+            const encoded = generateShareData();
+            const url = `${location.origin}${location.pathname}?draft=${encoded}`;
+
+            try {
+                await navigator.clipboard.writeText(url);
+                alert("Draft link copied!");
+            } catch {
+                prompt("Copy this link:", url);
+            }
+        };
+
         document.getElementById("cancelReset").onclick = () => {
             document.getElementById("resetOverlay").classList.add("hidden");
         };
@@ -901,6 +918,93 @@
                 tileSize: sizeSlider.value
             };
             localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+        }
+
+        function generateShareData() {
+
+            const bits = [];
+
+            champions.forEach(c => {
+                let state =
+                    c.state === "blue" ? 1 :
+                        c.state === "red" ? 2 :
+                            c.state === "ban" ? 3 :
+                                0;
+
+                bits.push((state >> 1) & 1);
+                bits.push(state & 1);
+
+                if (state !== 0) {
+                    const roleIndex = ROLES.indexOf(c.pickedRole);
+                    for (let i = 2; i >= 0; i--) {
+                        bits.push((roleIndex >> i) & 1);
+                    }
+                }
+            });
+
+            const byteLength = Math.ceil(bits.length / 8);
+            const bytes = new Uint8Array(byteLength);
+
+            bits.forEach((bit, i) => {
+                if (bit) {
+                    bytes[Math.floor(i / 8)] |= (1 << (7 - (i % 8)));
+                }
+            });
+
+            let binary = "";
+            bytes.forEach(b => binary += String.fromCharCode(b));
+
+            return btoa(binary)
+                .replace(/\+/g, "-")
+                .replace(/\//g, "_")
+                .replace(/=+$/, "");
+        }
+
+        function applyShareData(str) {
+            try {
+                str = str.replace(/-/g, "+").replace(/_/g, "/");
+                const binary = atob(str);
+
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+
+                const bits = [];
+                bytes.forEach(byte => {
+                    for (let i = 7; i >= 0; i--) {
+                        bits.push((byte >> i) & 1);
+                    }
+                });
+
+                let bitIndex = 0;
+
+                champions.forEach(c => {
+                    const state = (bits[bitIndex++] << 1) | bits[bitIndex++];
+
+                    if (state === 0) {
+                        c.state = "pool";
+                        c.pickedRole = null;
+                    } else {
+                        c.state =
+                            state === 1 ? "blue" :
+                                state === 2 ? "red" :
+                                    "ban";
+
+                        let roleIndex = 0;
+                        for (let i = 0; i < 3; i++) {
+                            roleIndex = (roleIndex << 1) | bits[bitIndex++];
+                        }
+
+                        c.pickedRole = ROLES[roleIndex] || ROLES[0];
+                    }
+                });
+
+                renderAll();
+
+            } catch (e) {
+                console.error("Invalid draft data");
+            }
         }
 
         function loadState() {
